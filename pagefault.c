@@ -81,7 +81,8 @@ void print_final_state() {
   int i; 
   printf("The number of page faults was %d\n\n", page_fault_count);
   for(i = 0; i < memory_size; i++) {
-    printf("Frame %d has page %d\n", i, page_frames[i].page->data);
+    if(page_frames[i].page != NULL)
+      printf("Frame %d has page %d\n", i, page_frames[i].page->data);
   }
  
 }
@@ -109,7 +110,6 @@ void first_in_first_out() {
       break;
     }
 
-
     cur_ref = page_queue->page->data;
 
     //check all page frames for empty slot first
@@ -126,9 +126,20 @@ void first_in_first_out() {
         page_frames[i].age++;
       }
     }
-    //there are still empty_slots
-    if(page_fault_count < memory_size)
-      continue;
+    //there are still empty memory slots
+    if(page_fault_count < memory_size) {
+      //empty memory slots but no more refs
+      if(ref_count == page_fault_count)
+        break;
+      //empty memory slots and more refs
+      else
+        continue;
+    }
+    //no empty memory slots, no refs remaining
+    else if(page_fault_count == memory_size) {
+      if(ref_count == page_fault_count)
+        break;
+    }
 
     cur_ref = page_queue->page->data;
 
@@ -217,7 +228,7 @@ int main(int argc, char** argv) {
     for(i = 0; i < ref_count; i++) {
       printf("%d ", page_refs[i]);
     }
-    printf(", memsize: %d, \n\n", memory_size);
+    printf(", memsize: %d\n\n", memory_size);
     first_in_first_out();
     exit(0);
   }
