@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 typedef struct page{
   int data;
@@ -10,6 +11,7 @@ typedef struct page{
 
 typedef struct frame {
   page_t *page; //frame contains n pages (between 1 and 50)
+  int age;
 } frame_t;
 
 typedef struct node {
@@ -60,17 +62,28 @@ page_t *dequeue(node_t **head) {
   return p;
 }
 
-int is_empty(node_t **head) {
-  if(head == NULL)
-    return 1;
-  else return 0;
+
+int get_oldest_frame() {
+  int i, oldest_frame = 0;
+  frame_t oldest = page_frames[0];
+
+  for(i = 1; i < memory_size; i++) {
+    if(page_frames[i].age > oldest.age) {
+      oldest = page_frames[i];
+      oldest_frame = i;
+    }
+  }
+  return oldest_frame;
 }
 
+
 void print_final_state() {
-  int i;
+  int i; 
+  printf("The number of page faults was %d\n\n", page_fault_count);
   for(i = 0; i < memory_size; i++) {
-    printf("Frame %d has page %d\n", i, 49);
+    printf("Frame %d has page %d\n", i, page_frames[i].page->data);
   }
+ 
 }
 
 void first_in_first_out() {
@@ -78,33 +91,69 @@ void first_in_first_out() {
   int i;
   page_t *p;
 
-  printf("ref count: %d\n", ref_count);
   for(i = 0; i < ref_count; i++) {
     p = malloc(sizeof(p));
     p->data = page_refs[i];
-    printf("p->data: %d\n", p->data);
     enqueue(&page_queue, p);
   }
 
   //initialize an array of size n frames, each of which contain a page
-  page_frames = malloc(memory_size * sizeof(page_frames));
+  page_frames = malloc(memory_size * sizeof(frame_t));
 
   //FIFO scheme
   page_t *temp;
+  int cur_ref;
   for(;;) {
-    int cur_ref = page_queue->page->data;
+
+    if(page_queue == NULL) {
+      break;
+    }
+
+
+    cur_ref = page_queue->page->data;
+
+    //check all page frames for empty slot first
     for(i = 0; i < memory_size; i++) {
       if(page_frames[i].page == NULL) {
-        page_frames[i].page = cur_ref;
+        page_frames[i].page = malloc(sizeof(page_t));
+        page_frames[i].page->data = cur_ref;
         temp = dequeue(&page_queue);
+        page_fault_count++;
+        break;
+      }
+      else {
+        //keep track of age
+        page_frames[i].age++;
+      }
+    }
+    //there are still empty_slots
+    if(page_fault_count < memory_size)
+      continue;
+
+    cur_ref = page_queue->page->data;
+
+    //no empty slots
+    for(i = 0; i <= memory_size; i++) {
+      //reached the end of memory, miss
+      if(i == memory_size) {
+        int oldest_frame = get_oldest_frame();
+        page_frames[oldest_frame].page->data = cur_ref;
+        page_frames[oldest_frame].age = -1;
+        temp = dequeue(&page_queue);
+        page_fault_count++;
+        break;
+      }
+      //hit, no page fault
+      else if(page_frames[i].page->data == cur_ref) { 
+        temp = dequeue(&page_queue);
+        break;
+      }
+      //no hit yet, check rest of memory
+      else {
         continue;
       }
     }
     
-    
-    
-    if(temp == NULL) 
-      break;
   }
   
 
@@ -168,12 +217,12 @@ int main(int argc, char** argv) {
     for(i = 0; i < ref_count; i++) {
       printf("%d ", page_refs[i]);
     }
-    printf(", memsize: %d, \n", memory_size);
+    printf(", memsize: %d, \n\n", memory_size);
     first_in_first_out();
     exit(0);
   }
   else if(!strcmp(argv[1], "LRU")) {
-    printf("LRU, page refs: %d, memsize: %d\n", ref_count, memory_size);
+    printf("LRU, page refs: %d, memsize: %d\n\n", ref_count, memory_size);
     least_recently_used();
     exit(0);
   }
