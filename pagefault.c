@@ -84,6 +84,8 @@ void print_final_state() {
   for(i = 0; i < memory_size; i++) {
     if(page_frames[i].page != NULL)
       printf("Frame %d has page %d\n", i, page_frames[i].page->data);
+    else
+      printf("Frame %d has nothing\n", i);
   }
  
 }
@@ -185,7 +187,7 @@ void least_recently_used() {
   //initialize an array of size n frames, each of which contain a page
   page_frames = malloc(memory_size * sizeof(frame_t));
 
-  //LRU scheme
+  //LRU scheme using a counter
   page_t *temp;
   int cur_ref;
   int oldest_frame;
@@ -301,7 +303,7 @@ int main(int argc, char** argv) {
 
   //validate and run the scheme which the user selected
   if(!strcmp(argv[1], "FIFO")) {
-    printf("FIFO, page refs: ");
+    printf("scheme: First in, first out, page refs: ");
     for(i = 0; i < ref_count; i++) {
       printf("%d ", page_refs[i]);
     }
@@ -310,7 +312,11 @@ int main(int argc, char** argv) {
     exit(0);
   }
   else if(!strcmp(argv[1], "LRU")) {
-    printf("LRU, page refs: %d, memsize: %d\n\n", ref_count, memory_size);
+    printf("scheme: Least recently used, page refs: ");
+    for(i = 0; i < ref_count; i++) {
+      printf("%d ", page_refs[i]);
+    }
+    printf(", memsize: %d\n\n", memory_size);
     least_recently_used();
     exit(0);
   }
