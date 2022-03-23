@@ -1,3 +1,4 @@
+//Shawn Diaz
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -164,19 +165,95 @@ void first_in_first_out() {
         continue;
       }
     }
-    
   }
-  
-
   print_final_state();
   free(p);
   free(page_frames);
 }
 
 void least_recently_used() {
+  //place refs in queue
+  int i;
+  page_t *p;
 
+  for(i = 0; i < ref_count; i++) {
+    p = malloc(sizeof(p));
+    p->data = page_refs[i];
+    enqueue(&page_queue, p);
+  }
 
+  //initialize an array of size n frames, each of which contain a page
+  page_frames = malloc(memory_size * sizeof(frame_t));
+
+  //LRU scheme
+  page_t *temp;
+  int cur_ref;
+  int oldest_frame;
+  for(;;) {
+
+    if(page_queue == NULL) {
+      break;
+    }
+
+    cur_ref = page_queue->page->data;
+
+    //check all page frames for empty slot first
+    for(i = 0; i < memory_size; i++) {
+      if(page_frames[i].page == NULL) {
+        page_frames[i].page = malloc(sizeof(page_t));
+        page_frames[i].page->data = cur_ref;
+        temp = dequeue(&page_queue);
+        page_fault_count++;
+        break;
+      }
+      else {
+        //keep track of age
+        page_frames[i].age++;
+      }
+    }
+    //there are still empty memory slots
+    if(page_fault_count < memory_size) {
+      //empty memory slots but no more refs
+      if(ref_count == page_fault_count)
+        break;
+      //empty memory slots and more refs
+      else
+        continue;
+    }
+    //no empty memory slots, no refs remaining
+    else if(page_fault_count == memory_size) {
+      if(ref_count == page_fault_count)
+        break;
+    }
+
+    cur_ref = page_queue->page->data;
+
+    //no empty slots
+    for(i = 0; i <= memory_size; i++) {
+      //reached the end of memory, miss
+      if(i == memory_size) {
+        oldest_frame = get_oldest_frame();
+        page_frames[oldest_frame].page->data = cur_ref;
+        page_frames[oldest_frame].age = -1;
+        temp = dequeue(&page_queue);
+        page_fault_count++;
+        break;
+      }
+      //hit, no page fault
+      else if(page_frames[i].page->data == cur_ref) { 
+        page_frames[i].age = -1;
+        temp = dequeue(&page_queue);
+        break;
+      }
+      //no hit yet, check rest of memory
+      else {
+        continue;
+      }
+    }
+  }
   print_final_state();
+  free(p);
+  free(page_frames);
 }
 
 int main(int argc, char** argv) {
