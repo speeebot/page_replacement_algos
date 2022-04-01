@@ -273,7 +273,7 @@ int main(int argc, char** argv) {
     ref_count++;
     if((temp = realloc(page_refs, ref_count * sizeof(page_refs)))) {
       page_refs = temp;
-      fscanf(fp, "%d", &page_refs[ref_count-1]);
+      fscanf(fp, "%d ", &page_refs[ref_count-1]);
     }
     else {
       printf("realloc error\n");
