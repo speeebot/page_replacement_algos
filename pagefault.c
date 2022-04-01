@@ -7,7 +7,6 @@
 
 typedef struct page{
   int data;
-  int last_used; //keep track of when page was last used, for LRU
 } page_t;
 
 typedef struct frame {
@@ -87,7 +86,6 @@ void print_final_state() {
     else
       printf("Frame %d has nothing\n", i);
   }
- 
 }
 
 void first_in_first_out() {
@@ -106,47 +104,26 @@ void first_in_first_out() {
 
   //FIFO scheme
   page_t *temp;
-  int cur_ref;
+  int cur_ref, iter = 0;
   for(;;) {
 
     if(page_queue == NULL) {
       break;
     }
 
+    //no more refs
+    if(iter == ref_count)
+      break;
+
     cur_ref = page_queue->page->data;
 
-    //check all page frames for empty slot first
+    //increment age of all non-empty memory slots
     for(i = 0; i < memory_size; i++) {
-      if(page_frames[i].page == NULL) {
-        page_frames[i].page = malloc(sizeof(page_t));
-        page_frames[i].page->data = cur_ref;
-        temp = dequeue(&page_queue);
-        page_fault_count++;
-        break;
-      }
-      else {
-        //keep track of age
+      if(page_frames[i].page != NULL) {
         page_frames[i].age++;
       }
     }
-    //there are still empty memory slots
-    if(page_fault_count < memory_size) {
-      //empty memory slots but no more refs
-      if(ref_count == page_fault_count)
-        break;
-      //empty memory slots and more refs
-      else
-        continue;
-    }
-    //no empty memory slots, no refs remaining
-    else if(page_fault_count == memory_size) {
-      if(ref_count == page_fault_count)
-        break;
-    }
-
-    cur_ref = page_queue->page->data;
-
-    //no empty slots
+    
     for(i = 0; i <= memory_size; i++) {
       //reached the end of memory, miss
       if(i == memory_size) {
@@ -157,16 +134,24 @@ void first_in_first_out() {
         page_fault_count++;
         break;
       }
-      //hit, no page fault
-      else if(page_frames[i].page->data == cur_ref) { 
+      //slot not empty
+      if(page_frames[i].page != NULL) {
+        //hit, no page fault
+        if(page_frames[i].page->data == cur_ref) { 
+          temp = dequeue(&page_queue);
+          break;
+        }
+      }
+      //reach empty slot, no hit, slot available
+      else if(page_frames[i].page == NULL) {
+        page_frames[i].page = malloc(sizeof(page_t));
+        page_frames[i].page->data = cur_ref;
         temp = dequeue(&page_queue);
+        page_fault_count++;
         break;
       }
-      //no hit yet, check rest of memory
-      else {
-        continue;
-      }
     }
+    iter++;
   }
   print_final_state();
   free(p);
@@ -189,69 +174,55 @@ void least_recently_used() {
 
   //LRU scheme using a counter
   page_t *temp;
-  int cur_ref;
-  int oldest_frame;
+  int cur_ref, iter = 0;
   for(;;) {
 
     if(page_queue == NULL) {
       break;
     }
 
+    //no more refs
+    if(iter == ref_count)
+      break;
+
     cur_ref = page_queue->page->data;
 
-    //check all page frames for empty slot first
+    //increment age of all non-empty memory slots
     for(i = 0; i < memory_size; i++) {
-      if(page_frames[i].page == NULL) {
-        page_frames[i].page = malloc(sizeof(page_t));
-        page_frames[i].page->data = cur_ref;
-        temp = dequeue(&page_queue);
-        page_fault_count++;
-        break;
-      }
-      else {
-        //keep track of age
+      if(page_frames[i].page != NULL) {
         page_frames[i].age++;
       }
     }
-    //there are still empty memory slots
-    if(page_fault_count < memory_size) {
-      //empty memory slots but no more refs
-      if(ref_count == page_fault_count)
-        break;
-      //empty memory slots and more refs
-      else
-        continue;
-    }
-    //no empty memory slots, no refs remaining
-    else if(page_fault_count == memory_size) {
-      if(ref_count == page_fault_count)
-        break;
-    }
-
-    cur_ref = page_queue->page->data;
-
-    //no empty slots
+    
     for(i = 0; i <= memory_size; i++) {
       //reached the end of memory, miss
       if(i == memory_size) {
-        oldest_frame = get_oldest_frame();
+        int oldest_frame = get_oldest_frame();
         page_frames[oldest_frame].page->data = cur_ref;
         page_frames[oldest_frame].age = -1;
         temp = dequeue(&page_queue);
         page_fault_count++;
         break;
       }
-      //hit, no page fault
-      else if(page_frames[i].page->data == cur_ref) { 
-        page_frames[i].age = -1;
+      //slot not empty
+      if(page_frames[i].page != NULL) {
+        //hit, no page fault
+        if(page_frames[i].page->data == cur_ref) { 
+          page_frames[i].age = -1;
+          temp = dequeue(&page_queue);
+          break;
+        }
+      }
+      //reach empty slot, no hit, slot available
+      else if(page_frames[i].page == NULL) {
+        page_frames[i].page = malloc(sizeof(page_t));
+        page_frames[i].page->data = cur_ref;
         temp = dequeue(&page_queue);
+        page_fault_count++;
         break;
       }
-      //no hit yet, check rest of memory
-      else {
-        continue;
-      }
     }
+    iter++;
   }
   print_final_state();
   free(p);
@@ -287,6 +258,15 @@ int main(int argc, char** argv) {
     printf("File %s does not exist\n", argv[2]);
     exit(1);
   }
+  //check if file is empty
+  int c = fgetc(fp);
+  if (c == EOF) {
+    printf("File %s is empty\n", argv[2]);
+    exit(1);
+  } else {
+    ungetc(c, fp);
+  }
+  //if file contains refs, read them
   void* temp;
   page_refs = malloc(sizeof(page_refs));
   while(!feof(fp)) {
